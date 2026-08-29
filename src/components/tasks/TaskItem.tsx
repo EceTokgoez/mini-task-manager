@@ -1,3 +1,4 @@
+import { TaskDeleteButton } from '@/components/tasks/TaskDeleteButton'
 import { TaskStatusSelect } from '@/components/tasks/TaskStatusSelect'
 import { PRIORITY_LABELS, type Task, type TaskPriority } from '@/types/task'
 
@@ -40,9 +41,13 @@ export function TaskItem({ task }: { task: Task }) {
         <p className="text-sm whitespace-pre-line opacity-70">{task.description}</p>
       ) : null}
 
-      <time dateTime={task.created_at} className="text-xs opacity-50">
-        {dateFormatter.format(new Date(task.created_at))}
-      </time>
+      <div className="flex items-center justify-between gap-4">
+        <time dateTime={task.created_at} className="text-xs opacity-50">
+          {dateFormatter.format(new Date(task.created_at))}
+        </time>
+
+        <TaskDeleteButton taskId={task.id} />
+      </div>
     </li>
   )
 }

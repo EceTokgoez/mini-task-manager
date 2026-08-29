@@ -155,3 +155,34 @@ export async function updateTaskStatus(
 
   return { error: null }
 }
+
+export async function deleteTask(taskId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Oturumun sona ermiş. Lütfen tekrar giriş yap.' }
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId)
+    .eq('user_id', user.id)
+    .select('id')
+
+  if (error) {
+    return { error: 'İş silinemedi. Lütfen tekrar dene.' }
+  }
+// Eger data bos ise, bu taskId'ye sahip bir is bulunamadi demektir. Bu durumda hata donuyoruz.
+  if (data.length === 0) {
+    return { error: 'İş bulunamadı.' }
+  }
+
+  revalidatePath('/tasks')
+
+  return { error: null }
+}
