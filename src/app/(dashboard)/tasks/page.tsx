@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
 
 import { signOut } from '@/actions/auth'
+import { getTasks } from '@/actions/tasks'
 import { TaskForm } from '@/components/tasks/TaskForm'
+import { TaskList } from '@/components/tasks/TaskList'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = { title: 'İşlerim' }
@@ -14,10 +16,11 @@ export default async function TasksPage() {
 
   // Middleware zaten koruyor ama user'a burada da ihtiyacımız var,
   // yoksa TypeScript'e göre null olabilir.
-  
   if (!user) {
     redirect('/login')
   }
+
+  const { tasks, error } = await getTasks()
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-12">
@@ -40,6 +43,13 @@ export default async function TasksPage() {
       <section className="mt-8">
         <h2 className="sr-only">Yeni iş ekle</h2>
         <TaskForm />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-sm font-medium opacity-60">
+          {tasks.length} iş
+        </h2>
+        <TaskList tasks={tasks} error={error} />
       </section>
     </main>
   )

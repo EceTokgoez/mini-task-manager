@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
-import { TASK_PRIORITIES, type TaskPriority } from '@/types/task'
+import { TASK_PRIORITIES, type Task, type TaskPriority } from '@/types/task'
 
 export type TaskFormState = {
   error: string | null
@@ -78,4 +78,30 @@ export async function createTask(
   revalidatePath('/tasks')
 
   return { error: null, success: true }
+}
+
+export async function getTasks(): Promise<{ tasks: Task[]; error: string | null }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { tasks: [], error: 'Oturumun sona ermiş. Lütfen tekrar giriş yap.' }
+  }
+
+  // RLS filtreyi uyguluyor ama yine de sorguya ekliyoruz ki TypeScript'e göre user.id null olmasın.
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return { tasks: [], error: 'İşler yüklenemedi. Lütfen sayfayı yenile.' }
+  }
+
+  return { tasks: data as Task[], error: null }
 }
