@@ -1,10 +1,5 @@
-import {
-  PRIORITY_LABELS,
-  STATUS_LABELS,
-  type Task,
-  type TaskPriority,
-  type TaskStatus,
-} from '@/types/task'
+import { TaskStatusSelect } from '@/components/tasks/TaskStatusSelect'
+import { PRIORITY_LABELS, type Task, type TaskPriority } from '@/types/task'
 
 // react component olarak TaskItem'i ayri bir dosyaya tasidik ki, TaskList'de map ile render ederken
 // her bir TaskItem kendi state'ini tutabilsin.
@@ -13,12 +8,6 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
   low: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
   medium: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   high: 'bg-red-500/10 text-red-600 dark:text-red-400',
-}
-
-const STATUS_BADGE: Record<TaskStatus, string> = {
-  todo: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
-  in_progress: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 }
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
@@ -37,12 +26,8 @@ export function TaskItem({ task }: { task: Task }) {
           {task.title}
         </h3>
 
-        <div className="flex shrink-0 gap-2">
-          <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[task.status]}`}
-          >
-            {STATUS_LABELS[task.status]}
-          </span>
+        <div className="flex shrink-0 items-start gap-2">
+          <TaskStatusSelect taskId={task.id} status={task.status} />
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_BADGE[task.priority]}`}
           >

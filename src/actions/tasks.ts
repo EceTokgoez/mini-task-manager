@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache'
 
 import { createClient } from '@/lib/supabase/server'
-import { TASK_PRIORITIES, type Task, type TaskPriority } from '@/types/task'
+import {
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  type Task,
+  type TaskPriority,
+  type TaskStatus,
+} from '@/types/task'
 
 export type TaskFormState = {
   error: string | null
@@ -16,6 +22,10 @@ const DESCRIPTION_MAX_LENGTH = 500
 
 function isTaskPriority(value: string): value is TaskPriority {
   return (TASK_PRIORITIES as readonly string[]).includes(value)
+}
+
+function isTaskStatus(value: string): value is TaskStatus {
+  return (TASK_STATUSES as readonly string[]).includes(value)
 }
 
 export async function createTask(
@@ -104,4 +114,44 @@ export async function getTasks(): Promise<{ tasks: Task[]; error: string | null 
   }
 
   return { tasks: data as Task[], error: null }
+}
+
+export async function updateTaskStatus(
+  taskId: string,
+  status: string,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Oturumun sona ermiş. Lütfen tekrar giriş yap.' }
+  }
+
+  if (!isTaskStatus(status)) {
+    return { error: 'Geçersiz durum değeri.' }
+  }
+
+// RLS filtreyi uyguluyor ama yine de sorguya ekliyoruz ki TypeScript'e göre user.id null olmasın.
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ status })
+    .eq('id', taskId)
+    .eq('user_id', user.id)
+    .select('id')
+
+  if (error) {
+    return { error: 'Durum güncellenemedi. Lütfen tekrar dene.' }
+  }
+
+  // Eger data bos ise, bu taskId'ye sahip bir is bulunamadi demektir. Bu durumda hata donuyoruz.
+  if (data.length === 0) {
+    return { error: 'İş bulunamadı.' }
+  }
+
+  revalidatePath('/tasks')
+
+  return { error: null }
 }
