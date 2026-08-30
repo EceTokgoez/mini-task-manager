@@ -90,7 +90,14 @@ export async function createTask(
   return { error: null, success: true }
 }
 
-export async function getTasks(): Promise<{ tasks: Task[]; error: string | null }> {
+export type TaskFilters = {
+  status?: string
+  priority?: string
+}
+
+export async function getTasks(
+  filters: TaskFilters = {},
+): Promise<{ tasks: Task[]; error: string | null }> {
   const supabase = await createClient()
 
   const {
@@ -101,13 +108,19 @@ export async function getTasks(): Promise<{ tasks: Task[]; error: string | null 
     return { tasks: [], error: 'Oturumun sona ermiş. Lütfen tekrar giriş yap.' }
   }
 
-  // RLS filtreyi uyguluyor ama yine de sorguya ekliyoruz ki TypeScript'e göre user.id null olmasın.
+// RLS filtreyi uyguluyor ama yine de sorguya ekliyoruz ki TypeScript'e göre user.id null olmasın.
+  let query = supabase.from('tasks').select('*').eq('user_id', user.id)
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+
+  if (filters.status && isTaskStatus(filters.status)) {
+    query = query.eq('status', filters.status)
+  }
+
+  if (filters.priority && isTaskPriority(filters.priority)) {
+    query = query.eq('priority', filters.priority)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     return { tasks: [], error: 'İşler yüklenemedi. Lütfen sayfayı yenile.' }

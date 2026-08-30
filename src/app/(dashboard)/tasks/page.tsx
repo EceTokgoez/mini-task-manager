@@ -2,13 +2,19 @@ import { redirect } from 'next/navigation'
 
 import { signOut } from '@/actions/auth'
 import { getTasks } from '@/actions/tasks'
+import { TaskFilters } from '@/components/tasks/TaskFilters'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskList } from '@/components/tasks/TaskList'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = { title: 'İşlerim' }
 
-export default async function TasksPage() {
+// PageProps<'/tasks'>, yani searchParams'in tipini '/tasks' rotasina gore aliyoruz.
+function firstValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+export default async function TasksPage({ searchParams }: PageProps<'/tasks'>) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -20,7 +26,14 @@ export default async function TasksPage() {
     redirect('/login')
   }
 
-  const { tasks, error } = await getTasks()
+  const { status, priority } = await searchParams
+  const filters = {
+    status: firstValue(status),
+    priority: firstValue(priority),
+  }
+
+  const { tasks, error } = await getTasks(filters)
+  const isFiltered = Boolean(filters.status || filters.priority)
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-12">
@@ -46,10 +59,14 @@ export default async function TasksPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium opacity-60">
-          {tasks.length} iş
-        </h2>
-        <TaskList tasks={tasks} error={error} />
+        <h2 className="sr-only">İşler</h2>
+
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <TaskFilters />
+          <span className="text-sm opacity-60">{tasks.length} iş</span>
+        </div>
+
+        <TaskList tasks={tasks} error={error} isFiltered={isFiltered} />
       </section>
     </main>
   )
