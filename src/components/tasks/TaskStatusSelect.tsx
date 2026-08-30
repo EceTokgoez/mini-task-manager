@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useOptimistic, useState, useTransition } from 'react'
 
 import { updateTaskStatus } from '@/actions/tasks'
 import { STATUS_LABELS, TASK_STATUSES, type TaskStatus } from '@/types/task'
@@ -18,23 +18,30 @@ const STATUS_STYLE: Record<TaskStatus, string> = {
 
 export function TaskStatusSelect({ taskId, status }: TaskStatusSelectProps) {
   const [isPending, startTransition] = useTransition()
-  const [value, setValue] = useState<TaskStatus>(status)
   const [error, setError] = useState<string | null>(null)
 
+  // useState degil useOptimistic: useState'in baslangic degeri yalnizca ilk
+  // montajda okunur, dolayisiyla Realtime ya da revalidate sonrasi gelen yeni
+  // status prop'u ekrana yansimazdi -- baska bir sekmede durum degistiginde
+  // select eski degerinde takili kalirdi.
+  //
+  // useOptimistic gecici degeri yalnizca transition suresince tutuyor, sonra
+  // gercek prop'a donuyor. Bu iki sey birden sagliyor: secim aninda tepki
+  // (istek beklenmeden) ve sunucu reddederse otomatik geri alma -- elle
+  // "onceki degeri sakla, hatada geri koy" yazmaya gerek kalmiyor.
+  const [value, setOptimisticValue] = useOptimistic(status)
+
   function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
-    const previous = value
     const next = event.target.value as TaskStatus
 
-    // Once ekranda degistiriyoruz ki secim aninda tepki versin; sunucu
-    // reddederse asagida eski degere geri donuyoruz.
-    setValue(next)
     setError(null)
 
     startTransition(async () => {
+      setOptimisticValue(next)
+
       const result = await updateTaskStatus(taskId, next)
 
       if (result.error) {
-        setValue(previous)
         setError(result.error)
       }
     })
