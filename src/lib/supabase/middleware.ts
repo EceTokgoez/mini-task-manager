@@ -3,8 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { supabaseKey, supabaseUrl } from './env'
 
-// Giriş yapmadan görülebilecek sayfalar.
-const PUBLIC_ROUTES = ['/login', '/register']
+// Giriş yapmış kullanıcının işi olmayan sayfalar: buradayken /tasks'a atılır.
+const AUTH_ROUTES = ['/login', '/register']
+
+// Herkese açık ön ekler. Paylaşım sayfası hem giriş yapmamış ziyaretçiye
+// açık olmalı hem de giriş yapmış kullanıcı linke tıkladığında /tasks'a
+// atılmamalı; bu yüzden AUTH_ROUTES'tan ayrı tutuluyor.
+const PUBLIC_PREFIXES = ['/share']
 
 // Auth token'ı süresi dolmadan yeniler ve giriş durumuna göre yönlendirir.
 export async function updateSession(request: NextRequest) {
@@ -35,13 +40,18 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isPublicRoute = PUBLIC_ROUTES.includes(pathname)
+  const isAuthRoute = AUTH_ROUTES.includes(pathname)
+  const isPublicRoute =
+    isAuthRoute ||
+    PUBLIC_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
 
   if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && isPublicRoute) {
+  if (user && isAuthRoute) {
     return NextResponse.redirect(new URL('/tasks', request.url))
   }
 

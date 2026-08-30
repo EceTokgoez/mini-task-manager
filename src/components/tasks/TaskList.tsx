@@ -1,15 +1,25 @@
 import { TaskItem } from '@/components/tasks/TaskItem'
-import type { Task } from '@/types/task'
+import type { SharedTask } from '@/types/task'
 
 type TaskListProps = {
-  tasks: Task[]
+  tasks: SharedTask[]
   error: string | null
   isFiltered: boolean
+  readOnly?: boolean
+  // Paylasim sayfasindaki ziyaretciye "yukaridaki formla ekle" demek anlamsiz
+  // olurdu; bos liste metni disaridan verilebiliyor.
+  emptyMessage?: string
 }
 
 // Veriyi kendisi cekmiyor ve sadece props ile aliyor.
 // Bu sayede TaskList'i server component olarak kullanabiliyoruz.
-export function TaskList({ tasks, error, isFiltered }: TaskListProps) {
+export function TaskList({
+  tasks,
+  error,
+  isFiltered,
+  readOnly = false,
+  emptyMessage,
+}: TaskListProps) {
   if (error) {
     return (
       <p
@@ -26,9 +36,10 @@ export function TaskList({ tasks, error, isFiltered }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-black/15 px-4 py-8 text-center text-sm opacity-60 dark:border-white/20">
-        {isFiltered
-          ? 'Bu filtreye uyan iş yok.'
-          : 'Henüz bir iş eklemedin. Yukarıdaki formla başlayabilirsin.'}
+        {emptyMessage ??
+          (isFiltered
+            ? 'Bu filtreye uyan iş yok.'
+            : 'Henüz bir iş eklemedin. Yukarıdaki formla başlayabilirsin.')}
       </p>
     )
   }
@@ -36,7 +47,7 @@ export function TaskList({ tasks, error, isFiltered }: TaskListProps) {
   return (
     <ul className="flex flex-col gap-3">
       {tasks.map((task) => (
-        <TaskItem key={task.id} task={task} />
+        <TaskItem key={task.id} task={task} readOnly={readOnly} />
       ))}
     </ul>
   )

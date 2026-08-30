@@ -16,6 +16,10 @@ export type Task = {
   updated_at: string
 }
 
+// Paylasim sayfasinda gosterilen is: get_shared_tasks fonksiyonu user_id
+// dondurmuyor, cunku anonim ziyaretcinin listenin sahibini bilmesine gerek yok.
+export type SharedTask = Omit<Task, 'user_id'>
+
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {
   low: 'Düşük',
   medium: 'Orta',

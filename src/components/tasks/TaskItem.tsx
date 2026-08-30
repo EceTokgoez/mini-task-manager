@@ -1,6 +1,12 @@
 import { TaskDeleteButton } from '@/components/tasks/TaskDeleteButton'
 import { TaskStatusSelect } from '@/components/tasks/TaskStatusSelect'
-import { PRIORITY_LABELS, type Task, type TaskPriority } from '@/types/task'
+import {
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  type SharedTask,
+  type TaskPriority,
+  type TaskStatus,
+} from '@/types/task'
 
 // react component olarak TaskItem'i ayri bir dosyaya tasidik ki, TaskList'de map ile render ederken
 // her bir TaskItem kendi state'ini tutabilsin.
@@ -21,7 +27,7 @@ const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
 // cevirip karsilastirmak yerine 'YYYY-MM-DD' dizgilerini karsilastiriyoruz —
 // bu format sozluk sirasinda da kronolojik sirali oldugu icin dogru sonuc verir
 // ve araya saat dilimi cevrimi girmez.
-function isOverdue(task: Task): boolean {
+function isOverdue(task: SharedTask): boolean {
   if (!task.due_date) {
     return false
   }
@@ -36,7 +42,22 @@ function isOverdue(task: Task): boolean {
   return task.due_date < today
 }
 
-export function TaskItem({ task }: { task: Task }) {
+const STATUS_BADGE: Record<TaskStatus, string> = {
+  todo: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
+  in_progress: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+}
+
+type TaskItemProps = {
+  // Task degil SharedTask: bu component user_id'yi hic kullanmiyor, o yuzden
+  // daha dar olan tipi istiyor. Task zaten bu sekle uydugu icin ikisi de gecer.
+  task: SharedTask
+  // Paylasim sayfasinda durum degistirme ve silme yok; durum salt okunur
+  // bir rozet olarak gosteriliyor.
+  readOnly?: boolean
+}
+
+export function TaskItem({ task, readOnly = false }: TaskItemProps) {
   const overdue = isOverdue(task)
 
   return (
@@ -49,7 +70,15 @@ export function TaskItem({ task }: { task: Task }) {
         </h3>
 
         <div className="flex shrink-0 items-start gap-2">
-          <TaskStatusSelect taskId={task.id} status={task.status} />
+          {readOnly ? (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_BADGE[task.status]}`}
+            >
+              {STATUS_LABELS[task.status]}
+            </span>
+          ) : (
+            <TaskStatusSelect taskId={task.id} status={task.status} />
+          )}
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_BADGE[task.priority]}`}
           >
@@ -87,7 +116,7 @@ export function TaskItem({ task }: { task: Task }) {
           {dateFormatter.format(new Date(task.created_at))}
         </time>
 
-        <TaskDeleteButton taskId={task.id} />
+        {readOnly ? null : <TaskDeleteButton taskId={task.id} />}
       </div>
     </li>
   )
