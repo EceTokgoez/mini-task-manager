@@ -17,7 +17,28 @@ const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
   year: 'numeric',
 })
 
+// due_date bir date kolonu, yani saat bilgisi yok. Bu yuzden Date nesnesine
+// cevirip karsilastirmak yerine 'YYYY-MM-DD' dizgilerini karsilastiriyoruz —
+// bu format sozluk sirasinda da kronolojik sirali oldugu icin dogru sonuc verir
+// ve araya saat dilimi cevrimi girmez.
+function isOverdue(task: Task): boolean {
+  if (!task.due_date) {
+    return false
+  }
+
+  // Tamamlanmis bir isi geciken olarak isaretlemek yaniltici olurdu.
+  if (task.status === 'done') {
+    return false
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  return task.due_date < today
+}
+
 export function TaskItem({ task }: { task: Task }) {
+  const overdue = isOverdue(task)
+
   return (
     <li className="flex flex-col gap-2 rounded-xl border border-black/10 p-4 dark:border-white/15">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -39,6 +60,26 @@ export function TaskItem({ task }: { task: Task }) {
 
       {task.description ? (
         <p className="text-sm whitespace-pre-line opacity-70">{task.description}</p>
+      ) : null}
+
+      {task.due_date ? (
+        <p
+          className={`flex items-center gap-1.5 text-xs ${
+            overdue
+              ? 'font-medium text-red-600 dark:text-red-400'
+              : 'opacity-60'
+          }`}
+        >
+          <span aria-hidden="true">{overdue ? '⚠' : '📅'}</span>
+          <span>
+            Son tarih:{' '}
+            <time dateTime={task.due_date}>
+              {dateFormatter.format(new Date(`${task.due_date}T00:00:00`))}
+            </time>
+          </span>
+          {/* Renk tek basina anlam tasimamali; gecikmeyi yaziyla da soyluyoruz. */}
+          {overdue ? <span>— gecikti</span> : null}
+        </p>
       ) : null}
 
       <div className="flex items-center justify-between gap-4">

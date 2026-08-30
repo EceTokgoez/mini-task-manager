@@ -53,6 +53,17 @@ export function TaskForm() {
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium">Son tarih</span>
+        <input
+          type="date"
+          name="due_date"
+          disabled={isPending}
+          className={fieldClassName}
+        />
+        <span className="text-xs opacity-60">İstersen boş bırakabilirsin.</span>
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Öncelik</span>
         <select
           name="priority"

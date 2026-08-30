@@ -28,6 +28,20 @@ function isTaskStatus(value: string): value is TaskStatus {
   return (TASK_STATUSES as readonly string[]).includes(value)
 }
 
+// YYYY-MM-DD formatinda ve gecerli bir tarih mi diye kontrol ediyoruz.
+function isValidDueDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false
+  }
+
+  const parsed = new Date(`${value}T00:00:00Z`)
+
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  )
+}
+
 export async function createTask(
   _prevState: TaskFormState,
   formData: FormData,
@@ -48,6 +62,7 @@ export async function createTask(
   const title = String(formData.get('title') ?? '').trim()
   const description = String(formData.get('description') ?? '').trim()
   const priority = String(formData.get('priority') ?? 'medium')
+  const dueDate = String(formData.get('due_date') ?? '').trim()
 
   if (!title) {
     return { error: 'Başlık zorunlu.', success: false }
@@ -73,11 +88,16 @@ export async function createTask(
     return { error: 'Geçersiz öncelik değeri.', success: false }
   }
 
+  if (dueDate && !isValidDueDate(dueDate)) {
+    return { error: 'Geçersiz son tarih.', success: false }
+  }
+
   const { error } = await supabase.from('tasks').insert({
     user_id: user.id,
     title,
     description: description || null,
     priority,
+    due_date: dueDate || null,
   })
 
   if (error) {
