@@ -10,8 +10,9 @@ import {
   TASK_STATUSES,
 } from '@/types/task'
 
+//mobilede select kutulari tam genislikta, desktop'ta ise otomatik genislikte olsun diye className'i degistiriyoruz.
 const selectClassName =
-  'rounded-lg border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/50 disabled:opacity-60 dark:border-white/20 dark:focus:border-white/60'
+  'w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black/50 disabled:opacity-60 sm:w-auto sm:text-sm dark:border-white/20 dark:focus:border-white/60'
 
 export function TaskFilters() {
   const router = useRouter()
@@ -44,8 +45,8 @@ export function TaskFilters() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <label className="flex items-center gap-2 text-sm">
+    <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap sm:items-center">
+      <label className="flex flex-col gap-1.5 text-sm sm:flex-row sm:items-center sm:gap-2">
         <span className="opacity-60">Durum</span>
         <select
           value={status}
@@ -62,7 +63,7 @@ export function TaskFilters() {
         </select>
       </label>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm sm:flex-row sm:items-center sm:gap-2">
         <span className="opacity-60">Öncelik</span>
         <select
           value={priority}
@@ -86,7 +87,7 @@ export function TaskFilters() {
             startTransition(() => router.replace(pathname, { scroll: false }))
           }
           disabled={isPending}
-          className="text-sm underline underline-offset-4 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-40"
+          className="col-span-2 justify-self-start py-1 text-sm underline underline-offset-4 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-40 sm:col-span-1"
         >
           Filtreleri temizle
         </button>

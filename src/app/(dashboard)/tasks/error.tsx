@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react'
 
+import { PageContainer } from '@/components/ui/PageContainer'
+
 // Hata ekraninda hata loglaniyor. Gercek projede buraya bir hata izleme servisi gireriz.
 export default function TasksError({
   error,
@@ -16,7 +18,7 @@ export default function TasksError({
   }, [error])
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-start gap-4 px-6 py-12">
+    <PageContainer className="items-start gap-4">
       <h1 className="text-2xl font-semibold tracking-tight">Bir şeyler ters gitti</h1>
 
       <p className="text-sm opacity-70">
@@ -37,6 +39,6 @@ export default function TasksError({
       >
         Tekrar dene
       </button>
-    </main>
+    </PageContainer>
   )
 }

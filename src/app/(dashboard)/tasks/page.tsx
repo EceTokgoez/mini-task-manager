@@ -7,6 +7,7 @@ import { TaskFilters } from '@/components/tasks/TaskFilters'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskList } from '@/components/tasks/TaskList'
 import { TaskListSkeleton } from '@/components/tasks/TaskListSkeleton'
+import { PageContainer } from '@/components/ui/PageContainer'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = { title: 'İşlerim' }
@@ -50,7 +51,7 @@ export default async function TasksPage({ searchParams }: PageProps<'/tasks'>) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-12">
+    <PageContainer>
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">İşlerim</h1>
@@ -88,6 +89,6 @@ export default async function TasksPage({ searchParams }: PageProps<'/tasks'>) {
           <TaskSection filters={filters} />
         </Suspense>
       </section>
-    </main>
+    </PageContainer>
   )
 }

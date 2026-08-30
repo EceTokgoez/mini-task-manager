@@ -27,13 +27,13 @@ export function TaskDeleteButton({ taskId }: { taskId: string }) {
   // Eger silme onayi alindiysa, kullaniciya iki secenek sunuyoruz.
   if (isConfirming) {
     return (
-      <div className="flex items-center gap-2 text-xs">
+      <div className="-mr-2 flex items-center gap-1 text-xs">
         <span className="opacity-60">Silinsin mi?</span>
         <button
           type="button"
           onClick={handleDelete}
           disabled={isPending}
-          className="font-medium text-red-600 underline underline-offset-2 disabled:opacity-50 dark:text-red-400"
+          className="px-2 py-1.5 font-medium text-red-600 underline underline-offset-2 disabled:opacity-50 dark:text-red-400"
         >
           {isPending ? 'Siliniyor...' : 'Evet'}
         </button>
@@ -41,7 +41,7 @@ export function TaskDeleteButton({ taskId }: { taskId: string }) {
           type="button"
           onClick={() => setIsConfirming(false)}
           disabled={isPending}
-          className="opacity-60 underline underline-offset-2 disabled:opacity-50"
+          className="px-2 py-1.5 opacity-60 underline underline-offset-2 disabled:opacity-50"
         >
           Vazgeç
         </button>
@@ -50,11 +50,11 @@ export function TaskDeleteButton({ taskId }: { taskId: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="-mr-2 flex items-center gap-1 text-xs">
       <button
         type="button"
         onClick={() => setIsConfirming(true)}
-        className="opacity-60 transition-opacity hover:text-red-600 hover:opacity-100 dark:hover:text-red-400"
+        className="px-2 py-1.5 opacity-60 transition-opacity hover:text-red-600 hover:opacity-100 dark:hover:text-red-400"
       >
         Sil
       </button>

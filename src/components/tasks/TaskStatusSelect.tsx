@@ -50,7 +50,7 @@ export function TaskStatusSelect({ taskId, status }: TaskStatusSelectProps) {
         value={value}
         onChange={handleChange}
         disabled={isPending}
-        className={`cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-medium outline-none disabled:opacity-50 ${STATUS_STYLE[value]}`}
+        className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-black/30 disabled:opacity-50 dark:focus-visible:ring-white/40 ${STATUS_STYLE[value]}`}
       >
         {TASK_STATUSES.map((option) => (
           <option key={option} value={option}>

@@ -20,9 +20,9 @@ const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
 export function TaskItem({ task }: { task: Task }) {
   return (
     <li className="flex flex-col gap-2 rounded-xl border border-black/10 p-4 dark:border-white/15">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <h3
-          className={`font-medium ${task.status === 'done' ? 'line-through opacity-60' : ''}`}
+          className={`font-medium break-words ${task.status === 'done' ? 'line-through opacity-60' : ''}`}
         >
           {task.title}
         </h3>
