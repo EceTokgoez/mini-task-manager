@@ -1,11 +1,14 @@
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
 import { signOut } from '@/actions/auth'
+import { getShareToken } from '@/actions/shares'
 import { getTasks, type TaskFilters as Filters } from '@/actions/tasks'
 import { TaskFilters } from '@/components/tasks/TaskFilters'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskList } from '@/components/tasks/TaskList'
+import { ShareLinkPanel } from '@/components/tasks/ShareLinkPanel'
 import { TaskListSkeleton } from '@/components/tasks/TaskListSkeleton'
 import { PageContainer } from '@/components/ui/PageContainer'
 import { createClient } from '@/lib/supabase/server'
@@ -43,6 +46,17 @@ export default async function TasksPage({ searchParams }: PageProps<'/tasks'>) {
   if (!user) {
     redirect('/login')
   }
+
+  const { token: shareToken } = await getShareToken()
+
+  // Paylasim adresini istek basliklarindan uretiyoruz: hem localhost'ta hem
+  // Vercel'de dogru calisiyor, ayri bir ortam degiskeni gerekmiyor.
+  // Vercel ters vekil arkasinda oldugu icin protokol x-forwarded-proto'dan.
+  const headerList = await headers()
+  const host = headerList.get('host')
+  const protocol = headerList.get('x-forwarded-proto') ?? 'http'
+  const shareUrl =
+    shareToken && host ? `${protocol}://${host}/share/${shareToken}` : null
 
   const { status, priority } = await searchParams
   const filters: Filters = {
@@ -88,6 +102,11 @@ export default async function TasksPage({ searchParams }: PageProps<'/tasks'>) {
         >
           <TaskSection filters={filters} />
         </Suspense>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="sr-only">Paylaşım</h2>
+        <ShareLinkPanel token={shareToken} shareUrl={shareUrl} />
       </section>
     </PageContainer>
   )
