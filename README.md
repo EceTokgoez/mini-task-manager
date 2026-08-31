@@ -5,7 +5,7 @@ Bu proje, kullanıcıların yalnızca kendi görevlerini oluşturup yönettiği,
 **Canlı demo:** https://mini-task-manager-ecetokgoezs-projects.vercel.app
 **Kaynak kod:** https://github.com/EceTokgoez/mini-task-manager
 
-> Demo kolay denenebilsin diye Supabase tarafında e-posta onayı kapalı tutuldu; kayıt olur olmaz uygulamayı kullanabilirsiniz. Üretimde bu ayar açık olmalıdır — kod her iki durumu da ele alıyor: `signUp` bir session döndürmezse kullanıcıya "e-postandaki linke tıkla" mesajı gösteriliyor.
+> Demo kolay denenebilsin diye Supabase tarafında e-posta onayı kapalı tutuldu; kayıt olur olmaz uygulamayı kullanabilirsiniz.
 
 ---
 
@@ -15,7 +15,10 @@ Bu proje, kullanıcıların yalnızca kendi görevlerini oluşturup yönettiği,
 - İş oluşturma: başlık, açıklama ve öncelik (düşük / orta / yüksek)
 - Durum güncelleme: yapılacak / devam ediyor / tamamlandı
 - İş silme — iki adımlı onay ile
+- Son tarih ve geciken işlerin görsel olarak vurgulanması
 - Durum ve öncelik filtresi; filtre durumu URL'de tutulur, link paylaşılabilir
+- Salt-okunur paylaşım linki: giriş yapmamış biri listeyi görebilir, değiştiremez
+- Realtime: başka bir sekmede yapılan değişiklik listeye anında yansır
 - Yükleme iskeletleri ve hata durumları
 - Mobil ve masaüstü uyumlu arayüz
 - Form doğrulama — hem istemci hem sunucu tarafında
@@ -55,14 +58,15 @@ npm install
 
 1. [supabase.com](https://supabase.com) üzerine yeni proje oluştur.
 2. SQL Editor bölümünü aç.
-3. [supabase/migrations/0001_create_tasks.sql](supabase/migrations/0001_create_tasks.sql) dosyasının içeriğini çalıştır.
+3. [supabase/migrations](supabase/migrations) içindeki dosyaları numara sırasıyla çalıştır:
 
-Bu migration şunları kurar:
+- [0001_create_tasks.sql](supabase/migrations/0001_create_tasks.sql) — `tasks` tablosu, index, trigger ve RLS politikaları
+- [0002_add_task_due_date.sql](supabase/migrations/0002_add_task_due_date.sql) — `due_date` alanı
+- [0003_add_task_shares.sql](supabase/migrations/0003_add_task_shares.sql) — `task_shares` tablosu ve paylaşılan liste mantığı
+- [0004_add_share_validity_check.sql](supabase/migrations/0004_add_share_validity_check.sql) — token doğrulama fonksiyonu
+- [0005_enable_realtime.sql](supabase/migrations/0005_enable_realtime.sql) — Realtime aktivasyonu
 
-- `public.tasks` tablosu
-- `(user_id, created_at desc)` indeksi
-- `updated_at` trigger'ı
-- Row Level Security politikaları
+Sıra önemli; sonraki dosyalar öncekilerin oluşturduğu nesnelere dayanıyor.
 
 ### 3) Ortam değişkenlerini ekle
 
@@ -95,7 +99,7 @@ Sonra browser'ı şu adrese aç:
 http://localhost:3000
 ```
 
-> Not: Supabase Auth'te e-posta onayı varsayılan olarak açıktır. Geliştirme sırasında hızlı test için **Authentication → Sign In / Providers → Email** altında "Confirm email" seçeneğini kapatabilirsin. Canlı demoda da bu ayar kapalı tutuldu.
+> Not: Supabase Auth'te e-posta onayı varsayılan olarak açıktır. Geliştirme sırasında hızlı test için "Confirm email" seçeneğini kapatabilirsin. Canlı demoda da bu ayar kapalı tutuldu.
 
 ---
 
@@ -109,17 +113,15 @@ Vercel'de **Add New → Project** ile GitHub deposunu içe aktar. Next.js otomat
 
 ### 2) Ortam değişkenlerini ekle
 
-**Settings → Environment Variables** altında yereldekiyle aynı iki değişken:
+**Settings → Environment Variables** altında aşağıdaki iki değer mutlaka eklenmeli:
 
-| Key | Environments |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Production, Preview, Development |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Production, Preview, Development |
+- `NEXT_PUBLIC_SUPABASE_URL` — Production, Preview, Development
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Production, Preview, Development
 
-İki nokta önemli:
+Önemli notlar:
 
-- **Tip olarak `Config` seçilmeli, `Secret` değil.** `NEXT_PUBLIC_` önekli değerler build sırasında tarayıcı paketine gömülür, yani zaten herkese açıktır; Vercel bu çelişki yüzünden `Secret` tipini reddediyor. Bu değerlerin açık olması bir sorun değil — veriyi koruyan RLS politikalarıdır.
-- **Değişkenler build anında gerekli.** `NEXT_PUBLIC_` değerleri çalışma anında değil derleme anında gömüldüğü için, eksiklerse build [src/lib/supabase/env.ts](src/lib/supabase/env.ts) içindeki kontrolde durur. Bu bilinçli: eksik yapılandırmayla sessizce bozuk bir uygulama yayına çıkmasın.
+- `NEXT_PUBLIC_` değerleri `Config` olarak eklenmeli; `Secret` olarak değil. Bu değerler build sırasında istemci tarafına gömülür ve doğal olarak herkese açıktır; güvenlik sorumluluğu RLS ile sağlanır.
+- Bu değişkenler build anında gerekli. Eksikse uygulama derlenmez ve [src/lib/supabase/env.ts](src/lib/supabase/env.ts) içinde hata verir.
 
 ### 3) Supabase'i canlı adrese göre ayarla
 
@@ -140,245 +142,146 @@ Vercel'de **Settings → Deployment Protection** varsayılan olarak açık geleb
 
 ### 1) Server Actions kullanıldı
 
-Veri işlemleri için ayrı bir route handler yerine Server Actions seçildi. Neden?
-
-- form submit akışı doğrudan server tarafında ilerliyor
-- API katmanı yazmaya gerek kalmıyor
-- `fetch`/`response` tiplerini iki kez tanımlamak gerekmiyor
-- App Router ile uyumlu ve sade bir yapı sunuyor
-
-Örnek olarak görev oluşturma, listeleme, durum güncelleme ve silme işlemleri [src/actions/tasks.ts](src/actions/tasks.ts) içinde tanımlı.
+Veri işlemleri için ayrı API katmanı kurmak yerine Server Actions seçildi. Bu sayede form submit akışı doğrudan sunucuya gider; `fetch`/`response` boilerplate'i azalır ve App Router ile uyumlu bir yapı elde edilir.
 
 ### 2) Minimal veri modeli
 
-Tek tablo yeterli görüldü: `tasks`. `profiles` gibi ayrı bir kullanıcı tablosu eklenmedi çünkü görev akışı için böyle bir soyutlama gerekli değildi. Kullanıcı ile görev ilişkisi `user_id` üzerinden kuruldu.
-
-`status` ve `priority` alanları `enum` yerine `text + check constraint` olarak tasarlandı. Bu tercih neden yapıldı?
-
-- yeni değer eklemek daha esnek
-- migration yönetimi daha hafif
-- enum değişiklikleri daha kırılgan oluyor
+Tek tablo yeterli göründü: `tasks`. `profiles` gibi ekstra kullanıcı tablosu eklenmedi; kullanıcı ile görev ilişkisi `user_id` üzerinden kuruldu. `status` ve `priority` alanları `enum` yerine `text + check constraint` olarak tasarlandı; böylece değerler daha esnek ve migration yönetimi daha hafif kalıyor.
 
 ### 3) RLS, asıl güvenlik katmanı
 
-Uygulama tarafında da kontrol var ama veri güvenliği asıl olarak veritabanında kuruldu. Bunun nedeni:
+Uygulama tarafında da kontrol var ama asıl güvenlik veritabanında kuruldu. Kodda bir filtre unutulsa bile Supabase RLS, başka kullanıcıların verisine erişimi engeller. Bu yüzden güvenlik için nihai kural RLS oldu.
 
-- kodda bir filtre unutulursa veri izolasyonu bozulur
-- başka bir servis veya script aynı veritabanına eriştiğinde aynı koruma çalışmalıdır
-- sadece UI tarafında kontrol etmek güvenli değildir
+### 4) `getUser()` kullanıldı
 
-Bu yüzden RLS, güvenlik için nihai kural olarak kullanıldı.
+Oturum doğrulamasında `getSession()` yerine `getUser()` tercih edildi. `getSession()` cookie'den okur ve güveni zayıflattığı için, sunucu tarafında yetkilendirme kararı verilecekse doğrulanan kullanıcı kullanılmalı.
 
-### 4) Oturum doğrulamada `getUser()`, `getSession()` değil
+### 5) Filtreler URL'de tutuluyor
 
-[src/proxy.ts](src/proxy.ts) her istekte oturumu yeniliyor ve giriş durumuna göre yönlendirme yapıyor; asıl mantık [src/lib/supabase/middleware.ts](src/lib/supabase/middleware.ts) içindeki `updateSession` fonksiyonunda. Burada bilinçli olarak `getUser()` kullanıldı:
+Filtreler `useState` yerine URL arama parametrelerinde saklanıyor. Bu sayede link paylaşılabilir, sayfa yenilense bile filtre korunur ve veritabanında filtreleme yapılır.
 
-- `getSession()` cookie'deki token'ı okur ve içeriğine güvenir
-- `getUser()` token'ı Supabase'e gönderip doğrulatır
+### 6) Hata ve yükleme akışı net ayrıldı
 
-Cookie kullanıcı tarafından düzenlenebilir bir alandır. Sunucu tarafında yetkilendirme kararı verilecekse doğrulanmış olan kullanılmalı.
-
-### 5) Filtre durumu URL'de tutuluyor
-
-Filtreler `useState` yerine URL arama parametrelerinde saklanıyor ([src/components/tasks/TaskFilters.tsx](src/components/tasks/TaskFilters.tsx)):
-
-- link paylaşılabilir ve yer imine eklenebilir ("yüksek öncelikli yapılacaklar" gibi)
-- sayfa yenilendiğinde filtre kaybolmuyor
-- filtreleme veritabanında yapılıyor; tüm kayıtları indirip istemcide ayıklamak gerekmiyor
-
-Geçmişe her filtre değişiminde yeni kayıt yığılmaması için `router.push` değil `router.replace` kullanılıyor.
-
-### 6) Hata ve yükleme durumları üç katmanda
-
-- Beklenen hata: Action'ların `{ error }` dönüşü — boş başlık, bulunamayan iş veya geçersiz değer gibi kullanıcı düzeltilebilecek durumları yakalar.
-- Beklenmedik hata: [error.tsx](src/app/%28dashboard%29/tasks/error.tsx) — sunucu ya da bağlantı hatalarında devreye girer.
-- Yanlış adres: [not-found.tsx](src/app/not-found.tsx) — mevcut olmayan bir URL için özel durum sayfası sunar.
-
-`getTasks` hata fırlatmak yerine `{ error }` döndürüyor; böylece liste yüklenemese bile sayfanın geri kalanı (form, filtreler) çalışmaya devam ediyor. `error.tsx` gerçekten beklenmedik durumlara ayrılmış oluyor.
-
-Yükleme tarafında iki ayrı senaryo var: [loading.tsx](src/app/%28dashboard%29/tasks/loading.tsx) sayfaya ilk gelişte, `Suspense` ise sayfa açıkken filtre değiştiğinde iskelet gösteriyor. `Suspense`'e filtreden türeyen bir `key` verilmesinin sebebi bu — `key` olmasaydı fallback yalnızca ilk render'da görünürdü.
+Beklenen hatalar action içinde `{ error }` olarak döner; beklenmedik hatalar [error.tsx](src/app/%28dashboard%29/tasks/error.tsx) üzerinden yakalanır. Yükleme sürecinde [loading.tsx](src/app/%28dashboard%29/tasks/loading.tsx) ve `Suspense` ayrı amaçlara hizmet eder.
 
 ### 7) Doğrulama hem istemcide hem sunucuda
 
-> Bu, görev tanımındaki bonus maddelerinden biriydi ("form doğrulama ve anlamlı hata mesajları — hem istemci hem sunucu tarafında") ve uygulandı.
+HTML kontrolleri hızlı geri bildirim verir; Server Action içinde aynı kurallar tekrar kontrol edilir. Bu, istemci tarafı manipülasyonlarını önler ve güvenli davranışı sağlar.
 
-HTML attribute'ları (`required`, `maxLength`, `type="email"`) kullanıcıya sunucuya gitmeden hızlı geri bildirim veriyor. Aynı kurallar Server Action içinde tekrar kontrol ediliyor, çünkü istemci tarafı kontroller tarayıcı araçlarından kaldırılabilir.
+### 8) Responsive ve erişilebilir tasarım
 
-`priority` ve `status` gibi kapalı değer kümeleri için tip guard'ları kullanılıyor:
+Mobil öncelikli tasarım, `sm:` kırılmaları ve `focus-visible` / `sr-only` kullanımları ile arayüz hem görsel olarak sade hem de erişilebilir kaldı.
 
-```ts
-function isTaskPriority(value: string): value is TaskPriority {
-  return (TASK_PRIORITIES as readonly string[]).includes(value)
-}
-```
+### 9) Son tarih için `date` tipi seçildi
 
-Server Action'lar dışarıdan çağrılabilen HTTP endpoint'leridir; select'ten gelmeyen bir değer (`curl` ile gönderilmiş olabilir) reddediliyor.
+`due_date` alanı saat değil gün bazlı tutuluyor. Bu sayede zaman dilimi farkından kaynaklı yanlış tarih görünümü önleniyor.
 
-Giriş hatalarında "e-posta bulunamadı" yerine **"E-posta veya şifre hatalı"** gösteriliyor. Hangisinin yanlış olduğunu söylemek, kayıtlı e-postaların tek tek denenerek tespit edilmesine imkan verirdi.
+### 10) Realtime için dikkatli kurulum yapıldı
 
-### 8) Responsive tasarım ve erişilebilirlik
+Realtime aboneliği sadece oturum hazırlandıktan sonra başlatılıyor; aksi halde token eksikliği nedeniyle olaylar gelmiyor. Ayrıca `replica identity full` ayarı, güncelleme ve silme olaylarının gelmesini sağlar.
 
-Arayüz mobil öncelikli yazıldı; Tailwind'in `sm:` kırılımı masaüstü düzenine geçiyor. Kayda değer birkaç karar:
+### 11) Durum seçicide `useOptimistic` kullanıldı
 
-- **Yüklenen font kullanılmıyordu.** `create-next-app` iskeleti `globals.css` içinde `font-family: Arial, Helvetica, sans-serif` bırakıyor, `layout.tsx` ise Geist'i yüklüyordu. Yani iki font dosyası indiriliyor, hiçbiri uygulanmıyordu. `font-family` CSS değişkenine bağlandı.
-- **iOS'ta otomatik yakınlaştırma.** Safari, 16px'ten küçük yazıya sahip bir form alanına odaklanınca sayfayı yakınlaştırıyor ve geri çıkmıyor. Filtre `select`'leri mobilde `text-base`, `sm:` üstünde `text-sm`.
-- **Dokunma alanları.** Durum seçici ve silme butonu metin boyutunda, yaklaşık 20px yüksekliğindeydi. Görünümü bozmadan iç boşlukları büyütüldü.
-- **Kart düzeni.** İş kartında başlık ve rozetler mobilde alt alta (`flex-col`), `sm:` üstünde yan yana. Önceki `flex-wrap` + `justify-between` kombinasyonu, rozetler alt satıra kaydığında onları sola itiyordu.
-- **Odak görünürlüğü.** Tarayıcının varsayılan odak halkası kaldırılan yerlerde yerine `focus:border` / `focus-visible:ring` konuldu; klavyeyle gezinme bozulmuyor.
-- **Ekran okuyucu.** Görsel olarak gereksiz ama yapısal olarak gerekli başlıklar ve form etiketleri `sr-only` ile veriliyor; yükleme iskeletleri `aria-hidden`.
-
-Ortak sayfa kabı [PageContainer](src/components/ui/PageContainer.tsx) içinde tutuluyor — genişlik sınırı ve kenar boşlukları dört sayfada (liste, hata, 404, yükleme) tek yerden yönetiliyor.
+Durum değişimi anında tepki vermeli; sunucu geri çevirdiğinde ise değer kendiliğinden eski haline dönmeli. Bu yüzden `useOptimistic` tercih edildi.
 
 ---
 
 ## RLS ve veri izolasyonu
 
-Migration dosyası [supabase/migrations/0001_create_tasks.sql](supabase/migrations/0001_create_tasks.sql) içinde RLS açık ve politika yapısı aşağıdaki gibidir:
+RLS, asıl güvenlik katmanı olarak kullanıldı. [supabase/migrations/0001_create_tasks.sql](supabase/migrations/0001_create_tasks.sql) içinde her kullanıcı yalnızca kendi `tasks` satırlarına erişebilir. `user_id = auth.uid()` kontrolü hem `SELECT`, hem `INSERT`, hem `UPDATE`, hem `DELETE` için uygulanıyor.
 
-```sql
-alter table public.tasks enable row level security;
+Bu önemli çünkü UI tarafında bir kontrol unutulsa bile veritabanı erişimi engellenir. Ayrıca action'lar da `eq('user_id', user.id)` kontrolü yapıyor; böylece arayüzdeki hata ile veritabanı güvenliği birlikte çalışır.
 
-create policy "Users can view their own tasks"
-  on public.tasks
-  for select
-  to authenticated
-  using (auth.uid() = user_id);
+`UPDATE` politikasında `using` ve `with check` birlikte kullanıldı, çünkü ikisi farklı anı kontrol ediyor: `using` kullanıcının hangi mevcut satıra dokunabileceğine, `with check` değişiklikten **sonra** oluşan satırın hâlâ ona ait olup olmadığına bakıyor. Yalnızca `using` olsaydı kullanıcı kendi görevinin `user_id` alanını başkasına çevirebilirdi — değişiklikten önceki satır kendisinin olduğu için `using` buna izin verirdi. `INSERT` politikasında ise yalnızca `with check` var; ortada kontrol edilecek mevcut bir satır yok.
 
-create policy "Users can create their own tasks"
-  on public.tasks
-  for insert
-  to authenticated
-  with check (auth.uid() = user_id);
+RLS'i test etmek için en güvenilir yöntem iki farklı kullanıcı açıp bir başkasının görevi silmeye veya güncellemeye çalışmaktır. Bu durumda Supabase sessizce boş sonuç döner; uygulama tarafında da "İş bulunamadı" hatası gösterilir.
 
-create policy "Users can update their own tasks"
-  on public.tasks
-  for update
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
-create policy "Users can delete their own tasks"
-  on public.tasks
-  for delete
-  to authenticated
-  using (auth.uid() = user_id);
-```
-
-`using` kontrolü mevcut satıra erişimi belirler; `with check` ise işlem sonrası satırın doğru kullanıcıya ait olup olmadığını kontrol eder.
-
-Özellikle `UPDATE` için her ikisi birlikte kullanılır. Yalnızca `using` varsa kullanıcı kendi işinin `user_id` alanını başka bir kullanıcıya çevirme riskine girer. `with check` bu davranışı engeller.
-
-Kod tarafında da benzer mantık vardır: [src/actions/tasks.ts](src/actions/tasks.ts) içinde her sorgu `user_id` eşleşmesiyle çalışır. Bu, güvenlik için tek başına yeterli değildir; asıl koruyucu katman RLS'dir. Ama sorgu seviyesinde kullanıcı kimliğinin açıkça belirtilmesi, hangi verinin istendiğini okunur kılıyor ve `(user_id, created_at desc)` index'inin doğrudan kullanılmasını sağlıyor.
-
-### RLS'in sessiz davranışı ve uygulamadaki karşılığı
-
-Bu, RLS ile çalışırken en kolay gözden kaçan nokta: **RLS erişilemeyen satırı hata vermeden gizler.** Başka bir kullanıcının iş id'si ile UPDATE veya DELETE gönderildiğinde Supabase hata döndürmez — sadece hiçbir satır eşleşmez ve `error` alanı `null` gelir.
-
-Bu kontrol edilmezse başarısız bir işlem kullanıcıya başarılı görünür. Bu yüzden mutasyon action'ları etkilenen satırı geri isteyip ayrıca kontrol ediyor:
-
-```ts
-const { data, error } = await supabase
-  .from('tasks')
-  .delete()
-  .eq('id', taskId)
-  .eq('user_id', user.id)
-  .select('id')
-
-if (error) return { error: 'İş silinemedi. Lütfen tekrar dene.' }
-if (data.length === 0) return { error: 'İş bulunamadı.' }
-```
-
-`.select('id')` olmasaydı `data` boş dönerdi ve hiç eşleşme olup olmadığı anlaşılamazdı.
-
-### RLS nasıl test edilir?
-
-- İki farklı hesap oluştur
-- Her hesap kendi işini oluştur
-- Diğer hesapla o işin ID'si üzerinden update/delete dene
-- Sonuç: yukarıdaki kontrol devreye girer ve "İş bulunamadı" döner
-
-> Supabase SQL Editor üzerinden `service_role` ile çalışan sorgular RLS'i bypass eder. Bu nedenle politikaları doğrulamak için uygulama üzerinden gerçek kullanıcı akışı gerekir.
+> `service_role` ile SQL Editor üzerinden yapılan sorgular RLS'i bypass eder. Bu yüzden doğrulama her zaman gerçek kullanıcı akışı ile yapılmalı.
 
 ---
 
-## Public /share/[token] için önerilen tasarım
+## Public paylaşım sayfası ve `anon` politikaları
 
-Bu özellik kodda mevcut değildir; ancak bonus gereklilik olarak açıkça tanımlanmıştır ve güvenli bir şekilde uygulanabilir. Mevcut proje yalnızca giriş yapmış kullanıcının kendi işlerini yönetmesine odaklanır; bu nedenle public sayfa, mevcut sistemin dışında ayrı bir paylaşım katmanı ile eklenmelidir.
+Bu bonus özellik, giriş yapmamış bir kullanıcıya salt-okunur liste gösterme mantığıyla hazırlandı. Asıl kural basit: `tasks` tablosuna doğrudan `anon` erişimi açılmaz; erişim sadece doğrulanmış token üzerinden yapılır.
 
-### Amaç
+`task_shares` tablosu kullanıcıya ait aktif paylaşım linkini tutar; `share_token` değeri `gen_random_uuid()` ile veritabanında üretiliyor, yani tahmin edilemez. Token doğrulaması uygulamada değil **veritabanında** yapılıyor: [src/actions/shares.ts](src/actions/shares.ts) token'ı `get_shared_tasks` adlı Postgres fonksiyonuna parametre olarak geçiriyor, fonksiyon da yalnızca geçerli ve aktif bir paylaşıma karşılık gelen görevleri döndürüyor. Böylece paylaşılan sayfa okuma modunda kalır; güncelleme veya silme için ayrı izin verilmez.
 
-- giriş yapmamış biri paylaşılan listeyi görebilsin
-- listeyi değiştiremesin, sadece okuma izni olsun
-- `tasks` tablosuna doğrudan `anon` erişimi açılmasın
-- paylaşım iptal edilebilir ve süresi dolabilir olsun
+[`/share/[token]`](src/app/share/%5Btoken%5D/page.tsx) sayfasında auth kontrolü yoktur; yetki token üzerinden veritabanı tarafında kontrol edilir. Link geçersizse 404 döner; aktif ama boş liste varsa boş görünüm gösterilir. Bu da güvenli ve anlaşılır bir davranıştır.
 
-### Önerilen yaklaşım
+### Politikalar nasıl kuruldu
 
-Ayrı bir `task_shares` tablosu eklenir. Burada paylaşılan şey tek bir görev değil, bir kullanıcıya ait iş listesi / görev setidir.
+`tasks` ve `task_shares` tablolarının ikisinde de yalnızca `authenticated` rolü için politika var; `anon` rolüne **hiçbir politika verilmedi**. RLS açıkken politika yoksa erişim de yoktur — yani anonim ziyaretçi iki tabloya da doğrudan ulaşamıyor. `task_shares`'a okuma izni vermek özellikle tehlikeli olurdu: anonim biri tabloyu tarayıp tüm aktif token'ları listeleyebilirdi ve token'ın gizliliği tek koruma.
 
-```sql
-create table public.task_shares (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  share_token text not null unique,
-  is_active boolean not null default true,
-  expires_at timestamptz null,
-  created_at timestamptz not null default now()
-);
-```
+Erişimin tek kapısı bu yüzden `get_shared_tasks` fonksiyonu. Fonksiyon `security definer` ile tanımlı, yani çağıranın değil sahibinin yetkisiyle çalışıyor ve RLS'i atlıyor. Güçlü bir yetki olduğu için kapsamı dar tutuldu:
 
-Bu modelde `anon` kullanıcıya doğrudan `tasks` tablosu `SELECT` izni verilmez. Bunun yerine, `share_token` doğrulayan bir fonksiyon veya server-side sorgu çalıştırılır. Bu sorgu yalnızca geçerli ve aktif paylaşım için izin verilen görevleri döndürür; `UPDATE` veya `DELETE` işlemi için ayrı yetki verilmez.
+- yalnızca geçerli ve aktif bir token'a karşılık gelen kullanıcının görevlerini döndürüyor; token bilinmeden hiçbir şey dönmüyor
+- `set search_path = ''` ile tanımlandı ve içindeki nesneler tam nitelikli yazıldı. Bu olmadan çağıran taraf `search_path`'i değiştirip fonksiyonun kullandığı tabloları sahte nesnelerle değiştirebilirdi
+- dönen kolonlar arasında `user_id` yok: anonim ziyaretçinin listeyi görmek için sahibinin kimliğine ihtiyacı yok. Bu ayrım tip seviyesinde de var — `SharedTask = Omit<Task, 'user_id'>`
 
-Sonuç olarak `/share/[token]` sayfası sadece okunur bir görünüm sunar. Arayüzde edit butonu gösterilmez ve mutasyon çağrıları hiç çalışmaz.
+Yani ana fikir şudur: kullanıcılar kendi listelerine RLS politikaları üzerinden erişir; paylaşılan link ise tablolara hiç dokunmayan, ayrı ve dar kapsamlı bir fonksiyon üzerinden yalnızca okuma sağlar.
 
-### RLS mantığı
+## Gereksinimlerin karşılığı
 
-Merkezi güvenlik kuralı şudur:
+Temel gereksinimlerin beşi ve bonusların dördü uygulandı.
 
-- `authenticated` kullanıcılar yalnızca kendi `tasks`'ına erişebilir
-- `anon` kullanıcı sadece doğrulanmış ve aktif `share_token` ile erişebilir
-- `tasks` tablosuna genel public `SELECT` açılmaz
+- Supabase Auth ile e-posta/şifre kaydı ve girişi; giriş yapmamış kullanıcı listeye erişemez — [src/actions/auth.ts](src/actions/auth.ts), [src/proxy.ts](src/proxy.ts)
+- İş oluşturma, listeleme, durum değiştirme ve silme — [src/actions/tasks.ts](src/actions/tasks.ts), [src/components/tasks](src/components/tasks)
+- Veri izolasyonu; uygulama kodunda ve veritabanında RLS ile — [supabase/migrations/0001_create_tasks.sql](supabase/migrations/0001_create_tasks.sql), "RLS ve veri izolasyonu"
+- Durum ve önceliğe göre filtreleme — [src/components/tasks/TaskFilters.tsx](src/components/tasks/TaskFilters.tsx)
+- Tailwind ile sade arayüz; hata/yükleme durumu ve responsive tasarım — teknik kararlar 6 ve 8
+- Next.js App Router + Server Actions, TypeScript, Supabase — teknik karar 1
+- Çalışan canlı demo — başlıktaki Vercel bağlantısı, giriş gerektirmeden erişilebilir
 
-Bu yaklaşım, “paylaşılan link herkes görebilsin” hedefini güvenli biçimde çözer.
+Bonuslar:
+
+- Public salt-okunur paylaşım sayfası ve RLS kurulumu — "Public paylaşım sayfası ve `anon` politikaları"
+- Supabase Realtime ile canlı güncelleme — teknik karar 10
+- Son tarih ve geciken işlerin vurgulanması — teknik karar 9
+- Form doğrulama, hem istemci hem sunucu tarafında — teknik karar 7
+
+---
+
+## Tamamlamaya fırsat bulamadığım ya da bilinçli olarak kapsam dışı bıraktığım kısımlar
+
+Görevin istediği her şey tamamlandı; aşağıdakiler istenmeyen ama akla gelebilecek eklemeler. İkiye ayırdım çünkü gerekçeleri farklı: ilk gruptakiler projeye değer katmayacağı için, ikinci gruptakiler önceliği daha düşük olduğu için dışarıda kaldı.
+
+### Değer katmayacağına karar verdiklerim
+
+- **`profiles` tablosu.** Görev kullanıcı adı, avatar veya profil bilgisi istemiyor. `auth.users` ile `tasks` arasında `user_id` üzerinden doğrudan ilişki kurmak yeterliydi. Araya bir tablo koysaydım, hiçbir alanını kullanmadığım bir varlığı bakmak zorunda kalırdım.
+- **Zod veya benzeri bir doğrulama kütüphanesi.** Doğrulanan alan sayısı beş (başlık, açıklama, öncelik, durum, son tarih) ve kuralları basit: boş mu, uzunluk sınırında mı, kapalı değer kümesinde mi. Elle yazılan kontroller ve tip guard'ları bunu bağımlılık eklemeden yapıyor. Alan sayısı artsaydı ya da aynı şemayı istemciyle paylaşmam gerekseydi tercih değişirdi.
+- **UI kütüphanesi.** Arayüz beş ekrandan oluşuyor ve bileşenlerin çoğu tek kullanımlık. Hazır bir set, kazandıracağı zamandan fazlasını paket boyutu ve API öğrenme maliyeti olarak geri alırdı.
+- **Sayfalama, arama ve sıralama seçenekleri.** Liste `created_at desc` ile sabit sıralı ve filtreleme zaten var. Kişisel bir iş listesinde beklenen kayıt sayısı bunları gerektirmiyor. Karar geri alınabilir: mevcut `(user_id, created_at desc)` index'i sayfalamayı doğrudan destekliyor.
+- **Kullanıcılar arası atama ve ekip akışı.** Görev tanımında açıkça kapsam dışı bırakılmıştı.
+- **Tema değiştirme düğmesi.** Arayüz `prefers-color-scheme` ile işletim sistemi temasını izliyor, yani koyu tema zaten çalışıyor. Ayrı bir düğme, tercihi saklamak için ek state ve depolama gerektirirdi; kazancı buna değmezdi.
+- **Son tarih alanında geçmiş günleri engellemek.** Bir iş yöneticisine kayıt çoğu zaman sonradan girilir; engellemek kullanıcıyı gerçek tarihi girmekten alıkoyardı. Ayrıca sunucu tarafında geçmiş tarihi reddetmiyoruz — yalnızca istemcide engellemek iki katmanı tutarsız hale getirirdi.
+
+### Önceliği düşük kaldığı için yapmadıklarım
+
+- **Görev düzenleme ekranı.** Oluşturulduktan sonra yalnızca durum değiştirilebiliyor; başlık, açıklama, öncelik ve son tarih sabit. Görev tanımı durum yönetimini istiyordu, tam düzenleme akışı kapsamı genişletirdi. Mevcut eksikler içinde kullanıcıyı en çok zorlayan bu.
+- **Şifre sıfırlama ve e-posta değiştirme.** Auth akışı kayıt, giriş ve çıkış ile sınırlı. Supabase bunları destekliyor ama akış ek sayfalar ve e-posta şablonları gerektiriyordu; şifresini unutan kullanıcının şu an bir yolu yok.
+- **Hesap silme.** Veritabanı tarafı hazır — `on delete cascade` sayesinde kullanıcı silinince işleri de siliniyor — ama arayüzde bir giriş noktası yok.
+- **"Geç tamamlandı" etiketi.** Bunu doğru gösterebilmek için `completed_at` damgası gerekiyor. Elimizdeki veriyle "son tarihi geçmiş + tamamlanmış" ile "geç tamamlanmış" ayırt edilemiyor: zamanında bitirilmiş bir iş de son tarih geçtikten sonra aynı görünür. Yanlış bilgi göstermektense göstermemeyi seçtim. (`updated_at` bu iş için uygun değil; her güncellemede değişiyor, tamamlanma anını temsil etmiyor.)
+- **Paylaşım linkine süre sınırı ve birden fazla link.** Şema `is_active` ile iptal etmeyi destekliyor; zamana bağlı sona erme için ek bir kolon ve arayüz gerekirdi. Hiç kullanılmayacak bir kolon bırakmaktansa iptali tek mekanizma yaptım. Kısmi unique index şu an kullanıcı başına tek aktif linke izin veriyor.
+- **Testler ve CI.** Otomatik test yok. Doğrulama elle yapıldı: iki hesapla veri izolasyonu, `set local role anon` ile RLS politikaları, iki sekmeyle Realtime.
+- **Bir performans ayrıntısı.** Sayfa ve `getTasks` ayrı ayrı `getUser()` çağırıyor, yani istek başına iki auth doğrulaması oluyor. Bu bilinçli: `getTasks` bir Server Action, yani sayfadan bağımsız da çağrılabilir ve kendi kontrolünü kendisi yapmalı. `user`'ı parametre olarak geçirmek çağrı sayısını yarıya indirirdi ama action'ın tek başına güvenli olma özelliğini kaybederdi. Bu ölçekte güvenliği tercih ettim.
 
 ---
 
-## Tamamlamaya fırsat bulamadığım ya da kapsam dışı bıraktığım kısımlar
+## Demo ortamına özel not
 
-### Bilinçli olarak yapmadıklarım
+Supabase'de e-posta onayı kapalı tutuldu; böylece değerlendiren kayıt olur olmaz uygulamayı deneyebiliyor. Üretimde bu ayar açık olmalı ve kod her iki durumu da destekliyor: `signUp` bir session döndürmezse kullanıcıya doğrulama mesajı gösteriliyor.
 
-Bunlar süre yetmediği için değil, projeye değer katmayacağına karar verdiğim için dışarıda kaldı:
-
-- **`profiles` tablosu.** Görev; kullanıcı adı, avatar veya profil bilgisi istemiyor. `auth.users` ile `tasks` arasında doğrudan ilişki yeterliydi. Ara bir tablo, ihtiyaç olmadan bakım maliyeti getiren bir soyutlama olurdu.
-- **Zod veya benzeri bir doğrulama kütüphanesi.** Doğrulanan alan sayısı az (başlık, açıklama, öncelik, durum) ve kuralları basit. Elle yazılan kontroller ve tip guard'ları aynı işi bağımlılık eklemeden yapıyor. Alan sayısı artsaydı tercih değişirdi.
-- **UI kütüphanesi.** Bu ölçekte Tailwind yeterliydi; hazır bileşen seti, öğrenme ve paket maliyetine değmezdi.
-- **Sayfalama.** Kişisel bir iş listesinde beklenen kayıt sayısı düşük. İhtiyaç doğduğunda mevcut `(user_id, created_at desc)` index'i sayfalamayı doğrudan destekliyor — yani karar geri alınabilir.
-- **Kullanıcılar arası atama, paylaşım ve ekip özellikleri.** Görev tanımında açıkça kapsam dışı bırakılmıştı.
-
-### Mevcut sürümün dışında kalanlar
-
-Bunlar temel gereksinimlerin dışında kalan, çekirdek çalışır hale geldikten sonra sıraya girecek maddeler:
-
-- **Public paylaşım sayfası (`/share/[token]`).** Tasarımı yukarıda anlatıldı; ayrı bir tablo, token üretimi ve `anon` rolü için ek politikalar gerektiriyor.
-- **Supabase Realtime.** Başka bir oturumdaki değişikliklerin listeye canlı yansıması.
-- **Son tarih (deadline) ve geciken işlerin vurgulanması.**
-- **Görev düzenleme ekranı.** Şu an başlık ve açıklama oluşturulduktan sonra değiştirilemiyor; yalnızca durum güncelleniyor.
-- **Testler ve CI.**
-
----
+İkinci bir sebebi daha var: Supabase'in ücretsiz planındaki yerleşik SMTP servisi saatte birkaç e-posta ile sınırlı ve dokümantasyonunda yalnızca test için önerildiği yazıyor. Onay açık bırakılsaydı, onay maili gecikince demo kendi hatası olmadan kırılmış görünebilirdi.
 
 ## Daha fazla vaktim olsaydı ne eklerdim
 
-Yukarıdaki listeyi öncelik sırasına koyarsam:
+Öncelik sırasıyla:
 
-1. **RLS için entegrasyon testi.** Projenin asıl iddiası veri izolasyonu; bunu her değişiklikte otomatik doğrulayan bir test, elle iki hesapla denemekten çok daha güvenilir. İlk sıraya bunu koymamın sebebi: kırıldığında en pahalı olan şey bu.
-2. **Görev düzenleme.** Kullanıcının en çok isteyeceği eksik özellik; bir işi yanlış yazdığında silip yeniden oluşturması gerekiyor.
-3. **Son tarih ve gecikme vurgusu.** Küçük bir kolon ekleme ve görsel bir işaret; maliyeti düşük, kullanım değeri yüksek.
-4. **Public paylaşım sayfası.** RLS tarafı gerçek iş olduğu için önce yukarıdakileri bitirirdim.
-5. **Supabase CLI ile migration yönetimi.** Şu an SQL dosyası panelden elle çalıştırılıyor; sürümlenmiş bir migration akışı ekip çalışmasında şart olurdu.
-6. **`getTasks` için ayrı bir okuma modülü.** `'use server'` dosyasındaki her export bir HTTP endpoint'i haline geliyor. Okuma işlemlerini `actions/` dışına almak, mutasyonlarla okumalar arasında daha net bir sınır çizerdi. (RLS koruduğu için mevcut haliyle bir güvenlik açığı değil, bir tasarım tercihi.)
-
----
+1. **RLS için entegrasyon testi.** Projenin asıl iddiası veri izolasyonu; bunu her değişiklikte otomatik doğrulayan bir test, elle iki hesapla denemekten çok daha güvenilir. İlk sıraya koymamın sebebi: kırıldığında en pahalı olan şey bu.
+2. **Görev düzenleme.** Kullanıcının en çok isteyeceği eksik özellik; şu an bir işi yanlış yazınca silip yeniden oluşturmak gerekiyor.
+3. **`completed_at` ve "geç tamamlandı" göstergesi.** Yukarıda anlatılan veri eksikliğini kapatırdı.
+4. **Supabase CLI ile migration yönetimi.** Şu an SQL dosyaları panelden elle çalıştırılıyor; sürümlenmiş bir migration akışı ekip çalışmasında şart olurdu.
+5. **Paylaşım linkine süre sınırı ve birden fazla link.** Şema tek aktif linke göre kurgulandı; farklı kişilere farklı linkler vermek istenirse kısmi unique index gözden geçirilmeli.
 
 ## Proje yapısı
 
@@ -393,18 +296,30 @@ src/
 │   │       ├── page.tsx
 │   │       ├── loading.tsx
 │   │       └── error.tsx
+│   ├── share/
+│   │   └── [token]/page.tsx      # public, salt okunur
 │   ├── layout.tsx
 │   ├── not-found.tsx
 │   └── page.tsx
 │
 ├── actions/
 │   ├── auth.ts
-│   └── tasks.ts
+│   ├── tasks.ts
+│   └── shares.ts
 │
 ├── components/
-│   ├── auth/
+│   ├── auth/AuthForm.tsx
 │   ├── tasks/
-│   └── ui/
+│   │   ├── TaskForm.tsx
+│   │   ├── TaskList.tsx
+│   │   ├── TaskItem.tsx
+│   │   ├── TaskListSkeleton.tsx
+│   │   ├── TaskFilters.tsx
+│   │   ├── TaskStatusSelect.tsx
+│   │   ├── TaskDeleteButton.tsx
+│   │   ├── TaskRealtime.tsx
+│   │   └── ShareLinkPanel.tsx
+│   └── ui/PageContainer.tsx
 │
 ├── lib/supabase/
 │   ├── client.ts
@@ -418,7 +333,11 @@ src/
 
 supabase/
 └── migrations/
-    └── 0001_create_tasks.sql
+    ├── 0001_create_tasks.sql
+    ├── 0002_add_task_due_date.sql
+    ├── 0003_add_task_shares.sql
+    ├── 0004_add_share_validity_check.sql
+    └── 0005_enable_realtime.sql
 ```
 
 ### Neden bu yapı?
